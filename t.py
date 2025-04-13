@@ -22,7 +22,7 @@ logging.basicConfig(
 TELEGRAM_BOT_TOKEN = '8013090789:AAGwVR_5bEGoZGcOhHG-7jc4bxmmubG--bU'
 OWNER_USERNAME = "Riyahacksyt"
 OWNER_CONTACT = "Contact @Riyahacksyt to buy keys"
-ALLOWED_GROUP_ID = -1002510238804
+ALLOWED_GROUP_ID = -1002186762150
 MAX_THREADS = 1000
 max_duration = 120
 bot_open = False
