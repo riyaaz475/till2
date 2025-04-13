@@ -1,4 +1,3 @@
-
 import os
 import time
 import logging
@@ -22,7 +21,7 @@ logging.basicConfig(
 TELEGRAM_BOT_TOKEN = '8013090789:AAGwVR_5bEGoZGcOhHG-7jc4bxmmubG--bU'
 OWNER_USERNAME = "Riyahacksyt"
 OWNER_CONTACT = "Contact @Riyahacksyt to buy keys"
-ALLOWED_GROUP_ID = -1002186762150
+ALLOWED_GROUP_IDS = [-1002186762150]  # Now a list to support multiple groups
 MAX_THREADS = 1000
 max_duration = 120
 bot_open = False
@@ -49,6 +48,7 @@ KEY_PRICES = {
     "15D": 700, # Price for 2-day key
     "30D": 1250, # Price for 2-day key
     "60D": 2000, # Price for 2-day key,
+
 }
 
 # Special Key Prices
@@ -247,9 +247,16 @@ owner_keyboard = [
     ['Generate Key', 'Keys', 'Delete Key'],
     ['Add Reseller', 'Remove Reseller', 'Add Coin'],
     ['Set Cooldown', 'OpenBot', 'CloseBot'],
-    ['🔑 Special Key']
+    ['🔑 Special Key', 'Menu']  # Added Menu button here
 ]
 owner_markup = ReplyKeyboardMarkup(owner_keyboard, resize_keyboard=True)
+
+# Menu keyboard
+menu_keyboard = [
+    ['Add Group ID', 'Remove Group ID'],
+    ['RE Status', 'Back to Home']
+]
+menu_markup = ReplyKeyboardMarkup(menu_keyboard, resize_keyboard=True)
 
 # Conversation States
 GET_DURATION = 1
@@ -265,6 +272,10 @@ GET_ADD_COIN_AMOUNT = 10
 GET_SET_COOLDOWN = 11
 GET_SPECIAL_KEY_DURATION = 12
 GET_SPECIAL_KEY_FORMAT = 13
+ADD_GROUP_ID = 14
+REMOVE_GROUP_ID = 15
+MENU_SELECTION = 16
+GET_RESELLER_INFO = 17
 
 def load_keys():
     if not os.path.exists(KEY_FILE):
@@ -331,7 +342,7 @@ def save_keys():
 
 def is_allowed_group(update: Update):
     chat = update.effective_chat
-    return chat.type in ['group', 'supergroup'] and chat.id == ALLOWED_GROUP_ID
+    return chat.type in ['group', 'supergroup'] and chat.id in ALLOWED_GROUP_IDS
 
 def is_owner(update: Update):
     return update.effective_user.username == OWNER_USERNAME
@@ -1165,6 +1176,176 @@ async def rules(update: Update, context: CallbackContext):
     )
     await update.message.reply_text(rules_text, parse_mode='Markdown')
 
+async def add_group_id_start(update: Update, context: CallbackContext):
+    if not is_owner(update):
+        await update.message.reply_text("❌ *Only the owner can add group IDs!*", parse_mode='Markdown')
+        return ConversationHandler.END
+
+    await update.message.reply_text("⚠️ *Enter the group ID to add to allowed list (include the - sign for negative IDs):*", parse_mode='Markdown')
+    return ADD_GROUP_ID
+
+async def add_group_id_input(update: Update, context: CallbackContext):
+    try:
+        group_id = int(update.message.text)
+        if group_id not in ALLOWED_GROUP_IDS:
+            ALLOWED_GROUP_IDS.append(group_id)
+            await update.message.reply_text(
+                f"✅ *Group ID {group_id} added successfully!*\n\n"
+                f"*Current allowed groups:* {', '.join(str(gid) for gid in ALLOWED_GROUP_IDS)}\n\n"
+                f"👑 *Bot Owner:* @{OWNER_USERNAME}",
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(
+                f"ℹ️ *Group ID {group_id} is already in the allowed list.*\n\n"
+                f"👑 *Bot Owner:* @{OWNER_USERNAME}",
+                parse_mode='Markdown'
+            )
+    except ValueError:
+        await update.message.reply_text("❌ *Invalid group ID! Please enter a valid numeric ID.*", parse_mode='Markdown')
+        return ConversationHandler.END
+    
+    return ConversationHandler.END
+
+async def remove_group_id_start(update: Update, context: CallbackContext):
+    if not is_owner(update):
+        await update.message.reply_text("❌ *Only the owner can remove group IDs!*", parse_mode='Markdown')
+        return ConversationHandler.END
+
+    await update.message.reply_text(
+        f"⚠️ *Enter the group ID to remove from allowed list.*\n\n"
+        f"*Current allowed groups:* {', '.join(str(gid) for gid in ALLOWED_GROUP_IDS)}",
+        parse_mode='Markdown'
+    )
+    return REMOVE_GROUP_ID
+
+async def remove_group_id_input(update: Update, context: CallbackContext):
+    try:
+        group_id = int(update.message.text)
+        if group_id in ALLOWED_GROUP_IDS:
+            ALLOWED_GROUP_IDS.remove(group_id)
+            await update.message.reply_text(
+                f"✅ *Group ID {group_id} removed successfully!*\n\n"
+                f"*Current allowed groups:* {', '.join(str(gid) for gid in ALLOWED_GROUP_IDS)}\n\n"
+                f"👑 *Bot Owner:* @{OWNER_USERNAME}",
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ *Group ID {group_id} not found in allowed list!*\n\n"
+                f"👑 *Bot Owner:* @{OWNER_USERNAME}",
+                parse_mode='Markdown'
+            )
+    except ValueError:
+        await update.message.reply_text("❌ *Invalid group ID! Please enter a valid numeric ID.*", parse_mode='Markdown')
+        return ConversationHandler.END
+    
+    return ConversationHandler.END
+
+async def show_menu(update: Update, context: CallbackContext):
+    if not is_owner(update):
+        await update.message.reply_text("❌ *Only owner can access this menu!*", parse_mode='Markdown')
+        return
+    
+    await update.message.reply_text(
+        "📋 *Owner Menu* - Select an option:",
+        parse_mode='Markdown',
+        reply_markup=menu_markup
+    )
+    return MENU_SELECTION
+
+async def back_to_home(update: Update, context: CallbackContext):
+    await update.message.reply_text(
+        "🏠 *Returned to main menu*",
+        parse_mode='Markdown',
+        reply_markup=owner_markup
+    )
+    return ConversationHandler.END
+
+async def reseller_status_start(update: Update, context: CallbackContext):
+    if not is_owner(update):
+        await update.message.reply_text("❌ *Only owner can check reseller status!*", parse_mode='Markdown')
+        return ConversationHandler.END
+    
+    await update.message.reply_text(
+        "⚠️ *Enter reseller's username or ID to check status:*",
+        parse_mode='Markdown'
+    )
+    return GET_RESELLER_INFO
+
+async def reseller_status_info(update: Update, context: CallbackContext):
+    input_text = update.message.text.strip()
+    
+    try:
+        # Try to get user by ID
+        user_id = int(input_text)
+        try:
+            user = await context.bot.get_chat(user_id)
+        except Exception as e:
+            logging.error(f"Error getting user by ID: {e}")
+            await update.message.reply_text("❌ *User not found!*", parse_mode='Markdown')
+            return ConversationHandler.END
+    except ValueError:
+        # Try to get user by username
+        if not input_text.startswith('@'):
+            input_text = '@' + input_text
+        try:
+            user = await context.bot.get_chat(input_text)
+            user_id = user.id
+        except Exception as e:
+            logging.error(f"Error getting user by username: {e}")
+            await update.message.reply_text("❌ *User not found!*", parse_mode='Markdown')
+            return ConversationHandler.END
+    
+    if user_id not in resellers:
+        await update.message.reply_text("❌ *This user is not a reseller!*", parse_mode='Markdown')
+        return ConversationHandler.END
+    
+    try:
+        # Calculate generated keys
+        generated_keys = 0
+        for key, info in keys.items():
+            if info['generated_by'] == user_id:
+                generated_keys += 1
+        for key, info in special_keys.items():
+            if info['generated_by'] == user_id:
+                generated_keys += 1
+        
+        balance = reseller_balances.get(user_id, 0)
+        
+        # Escape username for Markdown
+        username = escape_markdown(user.username, version=2) if user.username else 'N/A'
+        
+        message_text = (
+            f"📊 *Reseller Status*\n\n"
+            f"👤 *Username:* @{username}\n"
+            f"🆔 *ID:* `{user_id}`\n"
+            f"💰 *Balance:* {balance} coins\n"
+            f"🔑 *Keys Generated:* {generated_keys}\n\n"
+            f"👑 *Bot Owner:* @{OWNER_USERNAME}"
+        )
+        
+        # Split message if too long (though this one shouldn't be)
+        if len(message_text) > 4000:
+            part1 = message_text[:4000]
+            part2 = message_text[4000:]
+            await update.message.reply_text(part1, parse_mode='Markdown')
+            await update.message.reply_text(part2, parse_mode='Markdown')
+        else:
+            await update.message.reply_text(
+                message_text,
+                parse_mode='Markdown',
+                reply_markup=menu_markup
+            )
+    except Exception as e:
+        logging.error(f"Error in reseller_status_info: {e}")
+        await update.message.reply_text(
+            "❌ *An error occurred while processing your request.*",
+            parse_mode='Markdown'
+        )
+    
+    return MENU_SELECTION
+
 async def handle_button_click(update: Update, context: CallbackContext):
     chat = update.effective_chat
     query = update.message.text
@@ -1214,6 +1395,16 @@ async def handle_button_click(update: Update, context: CallbackContext):
         await close_bot(update, context)
     elif query == '🔑 Special Key':
         await generate_special_key_start(update, context)
+    elif query == 'Menu':
+        await show_menu(update, context)
+    elif query == 'Back to Home':
+        await back_to_home(update, context)
+    elif query == 'Add Group ID':
+        await add_group_id_start(update, context)
+    elif query == 'Remove Group ID':
+        await remove_group_id_start(update, context)
+    elif query == 'RE Status':
+        await reseller_status_start(update, context)
 
 async def check_expired_keys(context: CallbackContext):
     current_time = time.time()
@@ -1334,6 +1525,23 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
     )
 
+    # Add menu handler
+    menu_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Text("Menu"), show_menu)],
+        states={
+            MENU_SELECTION: [
+                MessageHandler(filters.Text("Add Group ID"), add_group_id_start),
+                MessageHandler(filters.Text("Remove Group ID"), remove_group_id_start),
+                MessageHandler(filters.Text("RE Status"), reseller_status_start),
+                MessageHandler(filters.Text("Back to Home"), back_to_home),
+            ],
+            GET_RESELLER_INFO: [MessageHandler(filters.TEXT & ~filters.COMMAND, reseller_status_info)],
+            ADD_GROUP_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_group_id_input)],
+            REMOVE_GROUP_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, remove_group_id_input)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_conversation)],
+    )
+
     # Add all handlers
     application.add_handler(generate_key_handler)
     application.add_handler(redeem_key_handler)
@@ -1346,6 +1554,7 @@ def main():
     application.add_handler(add_coin_handler)
     application.add_handler(set_cooldown_handler)
     application.add_handler(special_key_handler)
+    application.add_handler(menu_handler)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button_click))
